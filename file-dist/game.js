@@ -54,6 +54,8 @@
   var SHOT_SPEED = 520;
   var SHOT_TTL = 1.35;
   var FIRE_COOLDOWN = 0.18;
+  var OVERDRIVE_FIRE_COOLDOWN = 0.07;
+  var OVERDRIVE_SECONDS = 4;
   var STARTING_LIVES = 3;
   var RECOVERY_SECONDS = 2;
   var WAVE_CLEAR_SECONDS = 0.9;
@@ -78,7 +80,8 @@
     turnLeft: false,
     turnRight: false,
     thrust: false,
-    fire: false
+    fire: false,
+    overdrive: false
   };
   function createInitialState(bounds = { x: 960, y: 640 }) {
     const state2 = {
@@ -93,9 +96,13 @@
       comets: [],
       status: "ready",
       wave: 1,
+      waveSeed: 4307,
       lives: STARTING_LIVES,
       score: 0,
       riskChain: { multiplier: 1, hits: 0 },
+      overdriveCharge: 0,
+      overdriveTimer: 0,
+      nearMissIds: [],
       nextId: 1,
       fireCooldown: 0,
       recoveryTimer: 0,
@@ -122,6 +129,7 @@
     next.status = next.status === "ready" ? "playing" : next.status;
     next.elapsed += dt;
     next.fireCooldown = Math.max(0, next.fireCooldown - dt);
+    next.overdriveTimer = Math.max(0, next.overdriveTimer - dt);
     next.recoveryTimer = Math.max(0, next.recoveryTimer - dt);
     if (next.status === "recovering" && next.recoveryTimer <= 0) {
       next.status = "playing";
@@ -143,6 +151,10 @@
       next.skimmer.velocity.x += Math.cos(next.skimmer.angle) * THRUST_ACCELERATION * dt;
       next.skimmer.velocity.y += Math.sin(next.skimmer.angle) * THRUST_ACCELERATION * dt;
     }
+    if (input2.overdrive && next.overdriveCharge >= 100 && next.overdriveTimer <= 0) {
+      next.overdriveCharge = 0;
+      next.overdriveTimer = OVERDRIVE_SECONDS;
+    }
     const damping = Math.pow(DAMPING_PER_SECOND, dt * 60);
     next.skimmer.velocity.x *= damping;
     next.skimmer.velocity.y *= damping;
@@ -155,7 +167,7 @@
     );
     if (input2.fire && next.fireCooldown <= 0) {
       next.shots.push(createShot(next));
-      next.fireCooldown = FIRE_COOLDOWN;
+      next.fireCooldown = next.overdriveTimer > 0 ? OVERDRIVE_FIRE_COOLDOWN : FIRE_COOLDOWN;
     }
     next.shots = next.shots.map((shot) => ({
       ...shot,
@@ -178,6 +190,7 @@
         next.bounds
       )
     }));
+    resolveNearMisses(next);
     resolveShotHits(next);
     resolveSkimmerCollision(next);
     if (next.comets.length === 0 && next.status === "playing") {
@@ -190,9 +203,12 @@
     return {
       status: state2.status,
       wave: state2.wave,
+      waveSeed: state2.waveSeed,
       lives: state2.lives,
       score: state2.score,
       riskChain: { ...state2.riskChain },
+      overdriveCharge: state2.overdriveCharge,
+      overdriveTimer: state2.overdriveTimer,
       skimmer: { ...state2.skimmer, position: { ...state2.skimmer.position }, velocity: { ...state2.skimmer.velocity } },
       shots: state2.shots.map((shot) => ({ ...shot, position: { ...shot.position }, velocity: { ...shot.velocity } })),
       comets: state2.comets.map((comet) => ({
@@ -212,12 +228,15 @@
     const speed = 58 + wave * 8;
     const comets = [];
     for (let i = 0; i < count; i += 1) {
-      const angle = (wave * 71 + i * 137) % 360 * (Math.PI / 180);
+      const angle = (state2.waveSeed + wave * 71 + i * 137) % 360 * (Math.PI / 180);
+      const unstable = wave >= 5 && i === count - 1;
       const position = {
-        x: (state2.bounds.x * (0.18 + i * 0.31) + wave * 43) % (state2.bounds.x - 120) + 60,
-        y: (state2.bounds.y * (0.22 + i * 0.27) + wave * 29) % (state2.bounds.y - 120) + 60
+        x: (state2.bounds.x * (0.18 + i * 0.31) + state2.waveSeed * 0.11 + wave * 43) % (state2.bounds.x - 120) + 60,
+        y: (state2.bounds.y * (0.22 + i * 0.27) + state2.waveSeed * 0.07 + wave * 29) % (state2.bounds.y - 120) + 60
       };
-      comets.push(createComet(state2.nextId++, "large", position, { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed }));
+      const comet = createComet(state2.nextId++, "large", position, { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed });
+      comet.variant = unstable ? "unstable" : void 0;
+      comets.push(comet);
     }
     return comets;
   }
@@ -239,9 +258,24 @@
         x: state2.skimmer.velocity.x + direction.x * SHOT_SPEED,
         y: state2.skimmer.velocity.y + direction.y * SHOT_SPEED
       },
-      ttl: SHOT_TTL,
-      radius: 3
+      ttl: state2.overdriveTimer > 0 ? SHOT_TTL + 0.35 : SHOT_TTL,
+      radius: state2.overdriveTimer > 0 ? 5 : 3
     };
+  }
+  function resolveNearMisses(state2) {
+    if (state2.recoveryTimer > 0 || state2.status !== "playing" || state2.shots.length > 0 || state2.fireCooldown > 0) {
+      return;
+    }
+    for (const comet of state2.comets) {
+      if (state2.nearMissIds.includes(comet.id)) {
+        continue;
+      }
+      const gap = distance(state2.skimmer.position, comet.position) - state2.skimmer.radius - comet.radius;
+      if (gap > 0 && gap <= 36) {
+        state2.nearMissIds.push(comet.id);
+        awardRisk(state2, 25, 10);
+      }
+    }
   }
   function resolveShotHits(state2) {
     const remainingShots = [];
@@ -261,9 +295,13 @@
     state2.comets = [...remainingComets, ...spawnedComets];
   }
   function awardHitScore(state2, tier) {
-    state2.score += Math.round(TIER_SCORE[tier] * state2.riskChain.multiplier);
+    awardRisk(state2, TIER_SCORE[tier], 20);
+  }
+  function awardRisk(state2, baseScore, overdriveGain) {
+    state2.score += Math.round(baseScore * state2.riskChain.multiplier);
     state2.riskChain.hits += 1;
     state2.riskChain.multiplier = Math.min(4, 1 + state2.riskChain.hits * 0.25);
+    state2.overdriveCharge = Math.min(100, state2.overdriveCharge + overdriveGain);
   }
   function resolveSkimmerCollision(state2) {
     if (state2.recoveryTimer > 0 || state2.status !== "playing") {
@@ -275,6 +313,9 @@
     }
     state2.lives -= 1;
     state2.riskChain = { multiplier: 1, hits: 0 };
+    state2.overdriveCharge = 0;
+    state2.overdriveTimer = 0;
+    state2.nearMissIds = [];
     state2.shots = [];
     state2.skimmer.position = { x: state2.bounds.x / 2, y: state2.bounds.y / 2 };
     state2.skimmer.velocity = { x: 0, y: 0 };
@@ -287,6 +328,7 @@
     state2.status = "playing";
     state2.waveClearTimer = 0;
     state2.shots = [];
+    state2.nearMissIds = [];
     state2.comets = createWaveComets(state2, state2.wave);
   }
   function splitComet(state2, comet, shot) {
@@ -296,7 +338,7 @@
     }
     const baseAngle = Math.atan2(comet.velocity.y, comet.velocity.x) || Math.atan2(shot.velocity.y, shot.velocity.x);
     const speed = Math.max(90, Math.hypot(comet.velocity.x, comet.velocity.y) * 1.12);
-    const offsets = comet.tier === "core" ? [-1.05, -0.35, 0.35, 1.05] : [-0.72, 0.72];
+    const offsets = comet.tier === "core" ? [-1.05, -0.35, 0.35, 1.05] : comet.variant === "unstable" ? [-0.92, 0, 0.92] : [-0.72, 0.72];
     return offsets.map((offset) => {
       const angle = baseAngle + offset;
       return createComet(
@@ -326,9 +368,13 @@
       })),
       status: state2.status,
       wave: state2.wave,
+      waveSeed: state2.waveSeed,
       lives: state2.lives,
       score: state2.score,
       riskChain: { ...state2.riskChain },
+      overdriveCharge: state2.overdriveCharge,
+      overdriveTimer: state2.overdriveTimer,
+      nearMissIds: [...state2.nearMissIds],
       nextId: state2.nextId,
       fireCooldown: state2.fireCooldown,
       recoveryTimer: state2.recoveryTimer,
@@ -395,6 +441,7 @@
       <div class="hud__cluster">
         <span id="status">Ready</span>
         <span id="score">0 pts</span>
+        <span id="overdrive">Overdrive 0%</span>
         <span id="lives">3 lives</span>
         <span id="wave">Wave 1</span>
         <span id="comets">2 threats</span>
@@ -412,12 +459,14 @@
       <span>Left/Right or A/D rotate</span>
       <span>Up/W thrust</span>
       <span>Space fire</span>
+      <span>Shift overdrive</span>
     </section>
   </main>
 `;
   var canvas = document.querySelector("#game");
   var statusLabel = document.querySelector("#status");
   var scoreLabel = document.querySelector("#score");
+  var overdriveLabel = document.querySelector("#overdrive");
   var livesLabel = document.querySelector("#lives");
   var waveLabel = document.querySelector("#wave");
   var cometsLabel = document.querySelector("#comets");
@@ -426,7 +475,7 @@
   var muteButton = document.querySelector("#mute");
   var recordLabel = document.querySelector("#record");
   var victoryLabel = document.querySelector("#victory");
-  if (!canvas || !statusLabel || !scoreLabel || !livesLabel || !waveLabel || !cometsLabel || !startButton || !restartButton || !muteButton || !recordLabel || !victoryLabel) {
+  if (!canvas || !statusLabel || !scoreLabel || !overdriveLabel || !livesLabel || !waveLabel || !cometsLabel || !startButton || !restartButton || !muteButton || !recordLabel || !victoryLabel) {
     throw new Error("Missing game surface");
   }
   var context = canvas.getContext("2d");
@@ -437,6 +486,7 @@
   var ctx = context;
   var statusElement = statusLabel;
   var scoreElement = scoreLabel;
+  var overdriveElement = overdriveLabel;
   var livesElement = livesLabel;
   var waveElement = waveLabel;
   var cometsElement = cometsLabel;
@@ -462,7 +512,9 @@
     KeyD: "turnRight",
     ArrowUp: "thrust",
     KeyW: "thrust",
-    Space: "fire"
+    Space: "fire",
+    ShiftLeft: "overdrive",
+    ShiftRight: "overdrive"
   };
   window.addEventListener("keydown", (event) => {
     const mapped = keyMap[event.code];
@@ -504,34 +556,73 @@
     },
     loadScenario: (name) => {
       state = createInitialState({ x: gameCanvas.width, y: gameCanvas.height });
-      if (name === "single-large-shot") {
-        state.comets = [createComet(100, "large", { x: state.skimmer.position.x, y: state.skimmer.position.y - 70 }, { x: 0, y: 0 })];
-        state.nextId = 101;
-        state.skimmer.angle = -Math.PI / 2;
+      testScenarios[name]();
+      hasStarted = false;
+      render();
+    },
+    fireAtThreat: (index = 0) => {
+      const target = state.comets[index];
+      if (!target) {
+        state = stepGame(state, defaultInput, 1);
+        handleSideEffects();
+        render();
+        return;
       }
-      if (name === "collision") {
-        state.comets = [createComet(200, "large", { ...state.skimmer.position }, { x: 0, y: 0 })];
-        state.nextId = 201;
-      }
-      if (name === "clear-wave") {
-        state.comets = [];
-        state.status = "wave-cleared";
-        state.waveClearTimer = 0.1;
-      }
-      if (name === "first-victory") {
-        state.wave = 8;
-        state.score = 2400;
-        state.comets = [];
-        state.status = "wave-cleared";
-        state.waveClearTimer = 0.1;
-      }
-      hasStarted = true;
+      target.velocity = { x: 0, y: 0 };
+      state.shots = [
+        {
+          id: state.nextId++,
+          position: { ...target.position },
+          velocity: { x: 0, y: 0 },
+          ttl: 1,
+          radius: 5
+        }
+      ];
+      state.fireCooldown = 0;
+      state = stepGame(state, defaultInput, 1 / 60);
+      handleSideEffects();
       render();
     },
     step: (partialInput, dt = 1 / 60) => {
       state = stepGame(state, { ...defaultInput, ...partialInput }, dt);
       handleSideEffects();
       render();
+    }
+  };
+  var testScenarios = {
+    "single-large-shot": () => {
+      state.comets = [createComet(100, "large", { x: state.skimmer.position.x, y: state.skimmer.position.y - 70 }, { x: 0, y: 0 })];
+      state.nextId = 101;
+      state.skimmer.angle = -Math.PI / 2;
+    },
+    collision: () => {
+      state.comets = [createComet(200, "large", { ...state.skimmer.position }, { x: 0, y: 0 })];
+      state.nextId = 201;
+    },
+    "near-miss": () => {
+      state.comets = [createComet(300, "large", { x: state.skimmer.position.x + 96, y: state.skimmer.position.y }, { x: 0, y: 0 })];
+      state.nextId = 301;
+    },
+    "overdrive-ready": () => {
+      state.overdriveCharge = 100;
+    },
+    "clear-wave": () => {
+      state.comets = [];
+      state.status = "wave-cleared";
+      state.waveClearTimer = 0.1;
+    },
+    "first-victory": () => {
+      state.wave = 8;
+      state.score = 2400;
+      state.comets = [];
+      state.status = "wave-cleared";
+      state.waveClearTimer = 0.1;
+    },
+    "core-comet": () => {
+      state.wave = 8;
+      state.score = 2400;
+      state.comets = [createComet(800, "core", { x: state.bounds.x / 2, y: state.bounds.y * 0.28 }, { x: 0, y: 0 })];
+      state.nextId = 801;
     }
   };
   requestAnimationFrame(tick);
@@ -580,10 +671,11 @@
       ctx.fill();
     }
     for (const comet of state.comets) {
-      drawComet(comet.position.x, comet.position.y, comet.radius, comet.tier);
+      drawComet(comet.position.x, comet.position.y, comet.radius, comet.tier, comet.variant);
     }
     statusElement.textContent = formatStatus(state.status);
     scoreElement.textContent = `${state.score} pts`;
+    overdriveElement.textContent = state.overdriveTimer > 0 ? "Overdrive active" : `Overdrive ${Math.round(state.overdriveCharge)}%`;
     livesElement.textContent = `${state.lives} ${state.lives === 1 ? "life" : "lives"}`;
     waveElement.textContent = `Wave ${state.wave}`;
     cometsElement.textContent = `${state.comets.length} threat${state.comets.length === 1 ? "" : "s"}`;
@@ -639,10 +731,11 @@
     }
     ctx.restore();
   }
-  function drawComet(x, y, radius, tier) {
+  function drawComet(x, y, radius, tier, variant) {
     ctx.save();
     ctx.translate(x, y);
-    ctx.strokeStyle = tier === "core" ? "#ff6f91" : tier === "large" ? "#f29e6d" : tier === "medium" ? "#ffc76b" : "#f6f1b2";
+    ctx.strokeStyle = variant === "unstable" ? "#c8ff6e" : tier === "core" ? "#ff6f91" : tier === "large" ? "#f29e6d" : tier === "medium" ? "#ffc76b" : "#f6f1b2";
+    ctx.setLineDash(variant === "unstable" ? [6, 5] : []);
     ctx.fillStyle = tier === "core" ? "rgba(255, 111, 145, 0.16)" : "rgba(242, 158, 109, 0.13)";
     ctx.lineWidth = 3;
     ctx.beginPath();

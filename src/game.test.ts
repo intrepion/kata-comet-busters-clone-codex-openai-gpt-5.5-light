@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createComet, createInitialState, defaultInput, stepGame, wrapPosition } from "./game";
+import { createComet, createInitialState, createWaveComets, defaultInput, stepGame, wrapPosition } from "./game";
 
 describe("Meteor Breakers flight and fragmentation", () => {
   it("wraps positions across every playfield edge", () => {
@@ -78,5 +78,55 @@ describe("Meteor Breakers flight and fragmentation", () => {
 
     expect(next.wave).toBe(8);
     expect(next.comets.map((comet) => comet.tier)).toEqual(["core"]);
+  });
+
+  it("adds Unstable Comet variants to later deterministic Waves", () => {
+    const state = createInitialState({ x: 960, y: 640 });
+    const wave = createInitialState({ x: 960, y: 640 });
+    wave.wave = 4;
+    wave.comets = [];
+    wave.status = "wave-cleared";
+    wave.waveClearTimer = 0.1;
+
+    const next = stepGame(wave, defaultInput, 0.2);
+
+    expect(state.comets.some((comet) => comet.variant === "unstable")).toBe(false);
+    expect(next.wave).toBe(5);
+    expect(next.comets.some((comet) => comet.variant === "unstable")).toBe(true);
+  });
+
+  it("uses an explicit Wave Seed for reproducible layouts", () => {
+    const first = createInitialState({ x: 960, y: 640 });
+    const second = createInitialState({ x: 960, y: 640 });
+    second.waveSeed = first.waveSeed + 1;
+    second.comets = createWaveComets(second, 1);
+
+    expect(first.waveSeed).toBe(4307);
+    expect(createInitialState({ x: 960, y: 640 }).comets).toEqual(first.comets);
+    expect(second.comets).not.toEqual(first.comets);
+  });
+
+  it("rewards Near-Misses and charges Overdrive", () => {
+    const state = createInitialState({ x: 960, y: 640 });
+    state.comets = [createComet(40, "large", { x: state.skimmer.position.x + 96, y: state.skimmer.position.y }, { x: 0, y: 0 })];
+
+    const next = stepGame(state, defaultInput, 1 / 60);
+
+    expect(next.score).toBe(25);
+    expect(next.riskChain.multiplier).toBe(1.25);
+    expect(next.overdriveCharge).toBe(10);
+  });
+
+  it("activates Overdrive as a rapid-fire offensive state", () => {
+    const state = createInitialState({ x: 960, y: 640 });
+    state.overdriveCharge = 100;
+
+    const active = stepGame(state, { ...defaultInput, overdrive: true }, 1 / 60);
+    const fired = stepGame(active, { ...defaultInput, fire: true }, 1 / 60);
+
+    expect(fired.overdriveCharge).toBe(0);
+    expect(fired.overdriveTimer).toBeGreaterThan(3.9);
+    expect(fired.shots[0].radius).toBe(5);
+    expect(fired.fireCooldown).toBeLessThan(0.1);
   });
 });

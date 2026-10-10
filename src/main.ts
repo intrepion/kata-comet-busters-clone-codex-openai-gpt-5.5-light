@@ -4,12 +4,15 @@ import type { GameState, InputState } from "./domain";
 import { createComet, createInitialState, defaultInput, snapshot, stepGame } from "./game";
 import { loadLocalRecord, mergeProgress, saveLocalRecord, setMuted, type LocalRecord } from "./record";
 
+type TestScenario = "single-large-shot" | "collision" | "clear-wave" | "first-victory" | "core-comet" | "near-miss" | "overdrive-ready";
+
 declare global {
   interface Window {
     __meteorBreakersTest?: {
       getSnapshot: () => ReturnType<typeof snapshot>;
       reset: () => void;
-      loadScenario: (name: "single-large-shot" | "collision" | "clear-wave" | "first-victory") => void;
+      loadScenario: (name: TestScenario) => void;
+      fireAtThreat: (index?: number) => void;
       step: (input: Partial<InputState>, dt?: number) => void;
     };
   }
@@ -30,6 +33,7 @@ app.innerHTML = `
       <div class="hud__cluster">
         <span id="status">Ready</span>
         <span id="score">0 pts</span>
+        <span id="overdrive">Overdrive 0%</span>
         <span id="lives">3 lives</span>
         <span id="wave">Wave 1</span>
         <span id="comets">2 threats</span>
@@ -47,6 +51,7 @@ app.innerHTML = `
       <span>Left/Right or A/D rotate</span>
       <span>Up/W thrust</span>
       <span>Space fire</span>
+      <span>Shift overdrive</span>
     </section>
   </main>
 `;
@@ -54,6 +59,7 @@ app.innerHTML = `
 const canvas = document.querySelector<HTMLCanvasElement>("#game");
 const statusLabel = document.querySelector<HTMLSpanElement>("#status");
 const scoreLabel = document.querySelector<HTMLSpanElement>("#score");
+const overdriveLabel = document.querySelector<HTMLSpanElement>("#overdrive");
 const livesLabel = document.querySelector<HTMLSpanElement>("#lives");
 const waveLabel = document.querySelector<HTMLSpanElement>("#wave");
 const cometsLabel = document.querySelector<HTMLSpanElement>("#comets");
@@ -66,6 +72,7 @@ if (
   !canvas ||
   !statusLabel ||
   !scoreLabel ||
+  !overdriveLabel ||
   !livesLabel ||
   !waveLabel ||
   !cometsLabel ||
@@ -86,6 +93,7 @@ const gameCanvas = canvas;
 const ctx = context;
 const statusElement = statusLabel;
 const scoreElement = scoreLabel;
+const overdriveElement = overdriveLabel;
 const livesElement = livesLabel;
 const waveElement = waveLabel;
 const cometsElement = cometsLabel;
@@ -113,7 +121,9 @@ const keyMap: Record<string, keyof InputState> = {
   KeyD: "turnRight",
   ArrowUp: "thrust",
   KeyW: "thrust",
-  Space: "fire"
+  Space: "fire",
+  ShiftLeft: "overdrive",
+  ShiftRight: "overdrive"
 };
 
 window.addEventListener("keydown", (event) => {
@@ -161,34 +171,74 @@ window.__meteorBreakersTest = {
   },
   loadScenario: (name) => {
     state = createInitialState({ x: gameCanvas.width, y: gameCanvas.height });
-    if (name === "single-large-shot") {
-      state.comets = [createComet(100, "large", { x: state.skimmer.position.x, y: state.skimmer.position.y - 70 }, { x: 0, y: 0 })];
-      state.nextId = 101;
-      state.skimmer.angle = -Math.PI / 2;
+    testScenarios[name]();
+    hasStarted = false;
+    render();
+  },
+  fireAtThreat: (index = 0) => {
+    const target = state.comets[index];
+    if (!target) {
+      state = stepGame(state, defaultInput, 1);
+      handleSideEffects();
+      render();
+      return;
     }
-    if (name === "collision") {
-      state.comets = [createComet(200, "large", { ...state.skimmer.position }, { x: 0, y: 0 })];
-      state.nextId = 201;
-    }
-    if (name === "clear-wave") {
-      state.comets = [];
-      state.status = "wave-cleared";
-      state.waveClearTimer = 0.1;
-    }
-    if (name === "first-victory") {
-      state.wave = 8;
-      state.score = 2400;
-      state.comets = [];
-      state.status = "wave-cleared";
-      state.waveClearTimer = 0.1;
-    }
-    hasStarted = true;
+    target.velocity = { x: 0, y: 0 };
+    state.shots = [
+      {
+        id: state.nextId++,
+        position: { ...target.position },
+        velocity: { x: 0, y: 0 },
+        ttl: 1,
+        radius: 5
+      }
+    ];
+    state.fireCooldown = 0;
+    state = stepGame(state, defaultInput, 1 / 60);
+    handleSideEffects();
     render();
   },
   step: (partialInput, dt = 1 / 60) => {
     state = stepGame(state, { ...defaultInput, ...partialInput }, dt);
     handleSideEffects();
     render();
+  }
+};
+
+const testScenarios: Record<TestScenario, () => void> = {
+  "single-large-shot": () => {
+    state.comets = [createComet(100, "large", { x: state.skimmer.position.x, y: state.skimmer.position.y - 70 }, { x: 0, y: 0 })];
+    state.nextId = 101;
+    state.skimmer.angle = -Math.PI / 2;
+  },
+  collision: () => {
+    state.comets = [createComet(200, "large", { ...state.skimmer.position }, { x: 0, y: 0 })];
+    state.nextId = 201;
+  },
+  "near-miss": () => {
+    state.comets = [createComet(300, "large", { x: state.skimmer.position.x + 96, y: state.skimmer.position.y }, { x: 0, y: 0 })];
+    state.nextId = 301;
+  },
+  "overdrive-ready": () => {
+    state.overdriveCharge = 100;
+  },
+  "clear-wave": () => {
+    state.comets = [];
+    state.status = "wave-cleared";
+    state.waveClearTimer = 0.1;
+  },
+  "first-victory": () => {
+    state.wave = 8;
+    state.score = 2400;
+    state.comets = [];
+    state.status = "wave-cleared";
+    state.waveClearTimer = 0.1;
+  },
+  "core-comet": () => {
+    state.wave = 8;
+    state.score = 2400;
+    state.comets = [createComet(800, "core", { x: state.bounds.x / 2, y: state.bounds.y * 0.28 }, { x: 0, y: 0 })];
+    state.nextId = 801;
   }
 };
 
@@ -241,10 +291,11 @@ function render(): void {
     ctx.fill();
   }
   for (const comet of state.comets) {
-    drawComet(comet.position.x, comet.position.y, comet.radius, comet.tier);
+    drawComet(comet.position.x, comet.position.y, comet.radius, comet.tier, comet.variant);
   }
   statusElement.textContent = formatStatus(state.status);
   scoreElement.textContent = `${state.score} pts`;
+  overdriveElement.textContent = state.overdriveTimer > 0 ? "Overdrive active" : `Overdrive ${Math.round(state.overdriveCharge)}%`;
   livesElement.textContent = `${state.lives} ${state.lives === 1 ? "life" : "lives"}`;
   waveElement.textContent = `Wave ${state.wave}`;
   cometsElement.textContent = `${state.comets.length} threat${state.comets.length === 1 ? "" : "s"}`;
@@ -304,10 +355,11 @@ function drawSkimmer(current: GameState): void {
   ctx.restore();
 }
 
-function drawComet(x: number, y: number, radius: number, tier: string): void {
+function drawComet(x: number, y: number, radius: number, tier: string, variant?: string): void {
   ctx.save();
   ctx.translate(x, y);
-  ctx.strokeStyle = tier === "core" ? "#ff6f91" : tier === "large" ? "#f29e6d" : tier === "medium" ? "#ffc76b" : "#f6f1b2";
+  ctx.strokeStyle = variant === "unstable" ? "#c8ff6e" : tier === "core" ? "#ff6f91" : tier === "large" ? "#f29e6d" : tier === "medium" ? "#ffc76b" : "#f6f1b2";
+  ctx.setLineDash(variant === "unstable" ? [6, 5] : []);
   ctx.fillStyle = tier === "core" ? "rgba(255, 111, 145, 0.16)" : "rgba(242, 158, 109, 0.13)";
   ctx.lineWidth = 3;
   ctx.beginPath();
