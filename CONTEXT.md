@@ -44,6 +44,22 @@ _Avoid_: Tiny comet, pebble, debris
 A self-contained arcade challenge that ends when all active Comets and Shards are cleared or the Pilot loses all lives.
 _Avoid_: Level, round, stage
 
+**Risk Chain**:
+A scoring state that grows through clean shooting and near-misses, then resets when the Pilot loses a life.
+_Avoid_: Combo, streak, multiplier
+
+**Near-Miss**:
+A deliberate close pass by a Comet or Shard that rewards the Pilot for staying near danger without colliding.
+_Avoid_: Dodge bonus, graze, close call
+
+**Comet Variant**:
+A hazard behavior introduced gradually across Waves to increase challenge without making every object simply faster.
+_Avoid_: Enemy type, asteroid class, modifier
+
+**Unstable Comet**:
+A rare Comet Variant that creates extra pressure through less predictable fragmentation or movement.
+_Avoid_: Special asteroid, boss rock, chaos comet
+
 **Overdrive**:
 A temporary offensive score state earned through skillful play, especially near-misses and clean shooting.
 _Avoid_: Shield, bomb, generic boost
@@ -55,6 +71,18 @@ _Avoid_: Menu, lobby, garage
 **Recovery Window**:
 A short post-collision state where the Pilot respawns with temporary invulnerability.
 _Avoid_: Grace period, spawn shield, mercy time
+
+**Screen Wrap**:
+The playfield rule where the Skimmer, Comets, Shards, and shots leave one edge and re-enter from the opposite edge.
+_Avoid_: Teleport edge, boundary loop, wall pass
+
+**Threat Priority**:
+The visual readability rule that hazards must remain clearer than effects, particles, stars, score popups, or Overdrive visuals.
+_Avoid_: Visual polish, effects-first, juice
+
+**Minimal Synth Arcade**:
+The audio identity: compact synthesized feedback for thrust, shots, splits, life loss, and Overdrive without depending on music.
+_Avoid_: Cinematic score, retro beeps only, soundtrack-first audio
 
 **Direct-File Launch**:
 The user-facing browser launch path where the game runs from a double-clicked local HTML file without requiring a development server.
