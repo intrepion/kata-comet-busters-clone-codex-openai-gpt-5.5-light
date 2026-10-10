@@ -44,6 +44,10 @@ _Avoid_: Tiny comet, pebble, debris
 A self-contained arcade challenge that ends when all active Comets and Shards are cleared or the Pilot loses all lives.
 _Avoid_: Level, round, stage
 
+**Wave Seed**:
+A deterministic value used to create reproducible Wave layouts while preserving arcade variety.
+_Avoid_: Random level, RNG state, map code
+
 **First Victory**:
 The first successful run milestone, reached by clearing Wave 8.
 _Avoid_: Campaign clear, final ending, tutorial completion
@@ -107,3 +111,11 @@ _Avoid_: Cinematic score, retro beeps only, soundtrack-first audio
 **Direct-File Launch**:
 The user-facing browser launch path where the game runs from a double-clicked local HTML file without requiring a development server.
 _Avoid_: Localhost-only launch, Vite entry, source module launch
+
+**Playable Slice**:
+An implementation checkpoint that is independently playable, verified in a browser, committed, and pushed before the next slice begins.
+_Avoid_: Milestone, phase, partial build
+
+**Test Harness**:
+A narrow browser-only test surface for deterministic setup, stepping, and state inspection during automated verification.
+_Avoid_: Debug menu, cheat API, developer console
