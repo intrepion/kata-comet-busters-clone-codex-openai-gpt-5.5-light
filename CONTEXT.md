@@ -44,6 +44,14 @@ _Avoid_: Tiny comet, pebble, debris
 A self-contained arcade challenge that ends when all active Comets and Shards are cleared or the Pilot loses all lives.
 _Avoid_: Level, round, stage
 
+**First Victory**:
+The first successful run milestone, reached by clearing Wave 8.
+_Avoid_: Campaign clear, final ending, tutorial completion
+
+**Endless Continuation**:
+The optional score-chase state after First Victory where Waves keep escalating.
+_Avoid_: New game plus, postgame, survival mode
+
 **Risk Chain**:
 A scoring state that grows through clean shooting and near-misses, then resets when the Pilot loses a life.
 _Avoid_: Combo, streak, multiplier
@@ -60,6 +68,10 @@ _Avoid_: Enemy type, asteroid class, modifier
 A rare Comet Variant that creates extra pressure through less predictable fragmentation or movement.
 _Avoid_: Special asteroid, boss rock, chaos comet
 
+**Core Comet**:
+The Wave 8 setpiece Comet that sheds Shards in phases and creates the First Victory challenge.
+_Avoid_: Boss, enemy ship, final monster
+
 **Overdrive**:
 A temporary offensive score state earned through skillful play, especially near-misses and clean shooting.
 _Avoid_: Shield, bomb, generic boost
@@ -67,6 +79,14 @@ _Avoid_: Shield, bomb, generic boost
 **Hangar**:
 The between-run or between-wave context for options, best scores, and future progression.
 _Avoid_: Menu, lobby, garage
+
+**MVP Hangar**:
+The first Hangar scope: start or restart, controls, best score, mute, and First Victory marker.
+_Avoid_: Upgrade shop, metagame, loadout screen
+
+**Local Record**:
+Browser-local saved arcade progress, limited to best score, best Wave, mute preference, and First Victory completion.
+_Avoid_: Save file, profile, campaign state
 
 **Recovery Window**:
 A short post-collision state where the Pilot respawns with temporary invulnerability.
