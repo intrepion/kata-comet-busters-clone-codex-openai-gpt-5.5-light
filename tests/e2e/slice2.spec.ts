@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test("proves scoring, recovery, and Wave progression in-browser", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Flight Test" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "MVP Hangar" })).toBeVisible();
 
   await page.evaluate(() => {
     window.__meteorBreakersTest?.loadScenario("single-large-shot");

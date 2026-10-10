@@ -1,6 +1,8 @@
 import "./styles.css";
+import { ArcadeAudio } from "./audio";
 import type { GameState, InputState } from "./domain";
 import { createComet, createInitialState, defaultInput, snapshot, stepGame } from "./game";
+import { loadLocalRecord, mergeProgress, saveLocalRecord, setMuted, type LocalRecord } from "./record";
 
 declare global {
   interface Window {
@@ -23,7 +25,7 @@ app.innerHTML = `
     <section class="hud" aria-label="Meteor Breakers status">
       <div>
         <p class="eyebrow">Meteor Breakers</p>
-        <h1>Flight Test</h1>
+        <h1>MVP Hangar</h1>
       </div>
       <div class="hud__cluster">
         <span id="status">Ready</span>
@@ -33,7 +35,14 @@ app.innerHTML = `
         <span id="comets">2 threats</span>
       </div>
     </section>
-    <canvas id="game" width="960" height="640" aria-label="Meteor Breakers playfield"></canvas>
+    <section class="hangar" aria-label="MVP Hangar">
+      <button id="start" type="button">Start</button>
+      <button id="restart" type="button">Restart</button>
+      <button id="mute" type="button" aria-pressed="false">Mute</button>
+      <span id="record">Best 0 pts / Wave 1</span>
+      <span id="victory">First Victory pending</span>
+    </section>
+    <canvas id="game" width="960" height="640" aria-label="Meteor Breakers playfield" tabindex="0"></canvas>
     <section class="controls" aria-label="Controls">
       <span>Left/Right or A/D rotate</span>
       <span>Up/W thrust</span>
@@ -48,7 +57,24 @@ const scoreLabel = document.querySelector<HTMLSpanElement>("#score");
 const livesLabel = document.querySelector<HTMLSpanElement>("#lives");
 const waveLabel = document.querySelector<HTMLSpanElement>("#wave");
 const cometsLabel = document.querySelector<HTMLSpanElement>("#comets");
-if (!canvas || !statusLabel || !scoreLabel || !livesLabel || !waveLabel || !cometsLabel) {
+const startButton = document.querySelector<HTMLButtonElement>("#start");
+const restartButton = document.querySelector<HTMLButtonElement>("#restart");
+const muteButton = document.querySelector<HTMLButtonElement>("#mute");
+const recordLabel = document.querySelector<HTMLSpanElement>("#record");
+const victoryLabel = document.querySelector<HTMLSpanElement>("#victory");
+if (
+  !canvas ||
+  !statusLabel ||
+  !scoreLabel ||
+  !livesLabel ||
+  !waveLabel ||
+  !cometsLabel ||
+  !startButton ||
+  !restartButton ||
+  !muteButton ||
+  !recordLabel ||
+  !victoryLabel
+) {
   throw new Error("Missing game surface");
 }
 
@@ -63,10 +89,22 @@ const scoreElement = scoreLabel;
 const livesElement = livesLabel;
 const waveElement = waveLabel;
 const cometsElement = cometsLabel;
+const startElement = startButton;
+const restartElement = restartButton;
+const muteElement = muteButton;
+const recordElement = recordLabel;
+const victoryElement = victoryLabel;
 
 let state = createInitialState({ x: gameCanvas.width, y: gameCanvas.height });
+let hasStarted = false;
+let record: LocalRecord = loadLocalRecord();
+const audio = new ArcadeAudio(record.muted);
 const input: InputState = { ...defaultInput };
 let lastTime = performance.now();
+let previousShotCount = state.shots.length;
+let previousScore = state.score;
+let previousLives = state.lives;
+let previousWave = state.wave;
 
 const keyMap: Record<string, keyof InputState> = {
   ArrowLeft: "turnLeft",
@@ -94,10 +132,32 @@ window.addEventListener("keyup", (event) => {
   }
 });
 
+startElement.addEventListener("click", () => {
+  hasStarted = true;
+  state.status = state.status === "ready" ? "playing" : state.status;
+  gameCanvas.focus();
+  render();
+});
+
+restartElement.addEventListener("click", () => {
+  state = createInitialState({ x: gameCanvas.width, y: gameCanvas.height });
+  hasStarted = true;
+  gameCanvas.focus();
+  render();
+});
+
+muteElement.addEventListener("click", () => {
+  record = setMuted(record, !record.muted);
+  audio.setMuted(record.muted);
+  saveLocalRecord(record);
+  render();
+});
+
 window.__meteorBreakersTest = {
   getSnapshot: () => snapshot(state),
   reset: () => {
     state = createInitialState({ x: gameCanvas.width, y: gameCanvas.height });
+    hasStarted = false;
   },
   loadScenario: (name) => {
     state = createInitialState({ x: gameCanvas.width, y: gameCanvas.height });
@@ -115,10 +175,12 @@ window.__meteorBreakersTest = {
       state.status = "wave-cleared";
       state.waveClearTimer = 0.1;
     }
+    hasStarted = true;
     render();
   },
   step: (partialInput, dt = 1 / 60) => {
     state = stepGame(state, { ...defaultInput, ...partialInput }, dt);
+    handleSideEffects();
     render();
   }
 };
@@ -128,9 +190,33 @@ requestAnimationFrame(tick);
 function tick(now: number): void {
   const dt = Math.min(0.05, (now - lastTime) / 1000);
   lastTime = now;
-  state = stepGame(state, input, dt);
+  if (hasStarted) {
+    state = stepGame(state, input, dt);
+    handleSideEffects();
+  }
   render();
   requestAnimationFrame(tick);
+}
+
+function handleSideEffects(): void {
+  if (state.shots.length > previousShotCount) {
+    audio.blip("fire");
+  }
+  if (state.score > previousScore) {
+    audio.blip("hit");
+  }
+  if (state.lives < previousLives) {
+    audio.blip("life");
+  }
+  if (state.wave > previousWave) {
+    audio.blip("wave");
+  }
+  record = mergeProgress(record, { score: state.score, wave: state.wave, firstVictory: false });
+  saveLocalRecord(record);
+  previousShotCount = state.shots.length;
+  previousScore = state.score;
+  previousLives = state.lives;
+  previousWave = state.wave;
 }
 
 function render(): void {
@@ -151,6 +237,10 @@ function render(): void {
   livesElement.textContent = `${state.lives} ${state.lives === 1 ? "life" : "lives"}`;
   waveElement.textContent = `Wave ${state.wave}`;
   cometsElement.textContent = `${state.comets.length} threat${state.comets.length === 1 ? "" : "s"}`;
+  recordElement.textContent = `Best ${record.bestScore} pts / Wave ${record.bestWave}`;
+  victoryElement.textContent = record.firstVictory ? "First Victory complete" : "First Victory pending";
+  muteElement.textContent = record.muted ? "Unmute" : "Mute";
+  muteElement.setAttribute("aria-pressed", String(record.muted));
 }
 
 function formatStatus(status: GameState["status"]): string {

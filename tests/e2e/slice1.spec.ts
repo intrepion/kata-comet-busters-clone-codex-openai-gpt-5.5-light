@@ -2,7 +2,8 @@ import { expect, test } from "@playwright/test";
 
 test("plays the Slice 1 flight and fragmentation loop in-browser", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Flight Test" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "MVP Hangar" })).toBeVisible();
+  await page.getByRole("button", { name: "Start", exact: true }).click();
   await page.locator("#game").click();
   await page.keyboard.down("ArrowUp");
   await page.waitForTimeout(250);

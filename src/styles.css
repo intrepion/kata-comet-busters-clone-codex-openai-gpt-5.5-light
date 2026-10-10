@@ -32,6 +32,7 @@ body {
 }
 
 .hud,
+.hangar,
 .controls {
   display: flex;
   align-items: center;
@@ -61,6 +62,7 @@ body {
 }
 
 .hud__cluster,
+.hangar,
 .controls {
   flex-wrap: wrap;
 }
@@ -72,11 +74,27 @@ body {
 }
 
 .hud__cluster span,
+.hangar span,
 .controls span {
   border: 1px solid rgba(168, 189, 208, 0.24);
   background: rgba(7, 9, 21, 0.58);
   padding: 7px 9px;
   border-radius: 6px;
+}
+
+.hangar button {
+  min-height: 34px;
+  border: 1px solid rgba(143, 231, 255, 0.38);
+  background: rgba(143, 231, 255, 0.12);
+  color: #edf7ff;
+  border-radius: 6px;
+  padding: 7px 12px;
+  cursor: pointer;
+}
+
+.hangar button:hover,
+.hangar button:focus-visible {
+  background: rgba(143, 231, 255, 0.2);
 }
 
 #game {
