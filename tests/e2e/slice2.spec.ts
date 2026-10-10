@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test("proves scoring, recovery, and Wave progression in-browser", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/app.html");
   await expect(page.getByRole("heading", { name: "MVP Hangar" })).toBeVisible();
 
   await page.evaluate(() => {

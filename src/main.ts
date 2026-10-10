@@ -9,7 +9,7 @@ declare global {
     __meteorBreakersTest?: {
       getSnapshot: () => ReturnType<typeof snapshot>;
       reset: () => void;
-      loadScenario: (name: "single-large-shot" | "collision" | "clear-wave") => void;
+      loadScenario: (name: "single-large-shot" | "collision" | "clear-wave" | "first-victory") => void;
       step: (input: Partial<InputState>, dt?: number) => void;
     };
   }
@@ -175,6 +175,13 @@ window.__meteorBreakersTest = {
       state.status = "wave-cleared";
       state.waveClearTimer = 0.1;
     }
+    if (name === "first-victory") {
+      state.wave = 8;
+      state.score = 2400;
+      state.comets = [];
+      state.status = "wave-cleared";
+      state.waveClearTimer = 0.1;
+    }
     hasStarted = true;
     render();
   },
@@ -211,7 +218,11 @@ function handleSideEffects(): void {
   if (state.wave > previousWave) {
     audio.blip("wave");
   }
-  record = mergeProgress(record, { score: state.score, wave: state.wave, firstVictory: false });
+  record = mergeProgress(record, {
+    score: state.score,
+    wave: state.wave,
+    firstVictory: state.wave > 8 || (state.wave === 8 && state.status === "wave-cleared")
+  });
   saveLocalRecord(record);
   previousShotCount = state.shots.length;
   previousScore = state.score;
@@ -296,8 +307,8 @@ function drawSkimmer(current: GameState): void {
 function drawComet(x: number, y: number, radius: number, tier: string): void {
   ctx.save();
   ctx.translate(x, y);
-  ctx.strokeStyle = tier === "large" ? "#f29e6d" : tier === "medium" ? "#ffc76b" : "#f6f1b2";
-  ctx.fillStyle = "rgba(242, 158, 109, 0.13)";
+  ctx.strokeStyle = tier === "core" ? "#ff6f91" : tier === "large" ? "#f29e6d" : tier === "medium" ? "#ffc76b" : "#f6f1b2";
+  ctx.fillStyle = tier === "core" ? "rgba(255, 111, 145, 0.16)" : "rgba(242, 158, 109, 0.13)";
   ctx.lineWidth = 3;
   ctx.beginPath();
   for (let i = 0; i < 9; i += 1) {

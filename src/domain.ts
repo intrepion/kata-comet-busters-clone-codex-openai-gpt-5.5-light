@@ -3,7 +3,7 @@ export type Vector = {
   y: number;
 };
 
-export type CometTier = "large" | "medium" | "small";
+export type CometTier = "core" | "large" | "medium" | "small";
 
 export type Skimmer = {
   position: Vector;

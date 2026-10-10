@@ -11,18 +11,21 @@ const RECOVERY_SECONDS = 2;
 const WAVE_CLEAR_SECONDS = 0.9;
 
 const TIER_RADIUS: Record<CometTier, number> = {
+  core: 74,
   large: 52,
   medium: 32,
   small: 18
 };
 
 const TIER_SCORE: Record<CometTier, number> = {
+  core: 800,
   large: 100,
   medium: 150,
   small: 225
 };
 
 const TIER_CHILDREN: Partial<Record<CometTier, CometTier>> = {
+  core: "large",
   large: "medium",
   medium: "small"
 };
@@ -171,6 +174,12 @@ export function snapshot(state: GameState): GameSnapshot {
 }
 
 export function createWaveComets(state: GameState, wave: number): Comet[] {
+  if (wave === 8) {
+    return [
+      createComet(state.nextId++, "core", { x: state.bounds.x / 2, y: state.bounds.y * 0.28 }, { x: 72, y: 38 })
+    ];
+  }
+
   const count = Math.min(2 + Math.floor((wave - 1) / 2), 5);
   const speed = 58 + wave * 8;
   const comets: Comet[] = [];
@@ -272,7 +281,8 @@ function splitComet(state: GameState, comet: Comet, shot: Shot): Comet[] {
 
   const baseAngle = Math.atan2(comet.velocity.y, comet.velocity.x) || Math.atan2(shot.velocity.y, shot.velocity.x);
   const speed = Math.max(90, Math.hypot(comet.velocity.x, comet.velocity.y) * 1.12);
-  return [-0.72, 0.72].map((offset) => {
+  const offsets = comet.tier === "core" ? [-1.05, -0.35, 0.35, 1.05] : [-0.72, 0.72];
+  return offsets.map((offset) => {
     const angle = baseAngle + offset;
     return createComet(
       state.nextId++,

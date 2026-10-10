@@ -66,4 +66,17 @@ describe("Meteor Breakers flight and fragmentation", () => {
     expect(next.comets.every((comet) => comet.tier === "large")).toBe(true);
     expect(next.comets.length).toBeGreaterThan(0);
   });
+
+  it("uses a Core Comet setpiece for Wave 8", () => {
+    const state = createInitialState({ x: 960, y: 640 });
+    state.wave = 7;
+    state.comets = [];
+    state.status = "wave-cleared";
+    state.waveClearTimer = 0.1;
+
+    const next = stepGame(state, defaultInput, 0.2);
+
+    expect(next.wave).toBe(8);
+    expect(next.comets.map((comet) => comet.tier)).toEqual(["core"]);
+  });
 });

@@ -38,4 +38,8 @@ describe("Local Record", () => {
 
     expect(mergeProgress(record, { score: 3000, wave: 2 })).toEqual(record);
   });
+
+  it("marks First Victory after the Wave 8 milestone is complete", () => {
+    expect(mergeProgress(defaultLocalRecord, { score: 8000, wave: 8, firstVictory: true }).firstVictory).toBe(true);
+  });
 });

@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test("uses the MVP Hangar and persists the Local Record", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/app.html");
   await page.evaluate(() => window.localStorage.clear());
   await page.reload();
 
