@@ -6,11 +6,20 @@ const DAMPING_PER_SECOND = 0.985;
 const SHOT_SPEED = 520;
 const SHOT_TTL = 1.35;
 const FIRE_COOLDOWN = 0.18;
+const STARTING_LIVES = 3;
+const RECOVERY_SECONDS = 2;
+const WAVE_CLEAR_SECONDS = 0.9;
 
 const TIER_RADIUS: Record<CometTier, number> = {
   large: 52,
   medium: 32,
   small: 18
+};
+
+const TIER_SCORE: Record<CometTier, number> = {
+  large: 100,
+  medium: 150,
+  small: 225
 };
 
 const TIER_CHILDREN: Partial<Record<CometTier, CometTier>> = {
@@ -26,7 +35,7 @@ export const defaultInput: InputState = {
 };
 
 export function createInitialState(bounds: Vector = { x: 960, y: 640 }): GameState {
-  return {
+  const state: GameState = {
     bounds,
     skimmer: {
       position: { x: bounds.x / 2, y: bounds.y / 2 },
@@ -35,15 +44,20 @@ export function createInitialState(bounds: Vector = { x: 960, y: 640 }): GameSta
       radius: 16
     },
     shots: [],
-    comets: [
-      createComet(1, "large", { x: bounds.x * 0.2, y: bounds.y * 0.25 }, { x: 54, y: 34 }),
-      createComet(2, "large", { x: bounds.x * 0.78, y: bounds.y * 0.68 }, { x: -42, y: -28 })
-    ],
+    comets: [],
     status: "ready",
-    nextId: 3,
+    wave: 1,
+    lives: STARTING_LIVES,
+    score: 0,
+    riskChain: { multiplier: 1, hits: 0 },
+    nextId: 1,
     fireCooldown: 0,
+    recoveryTimer: 0,
+    waveClearTimer: 0,
     elapsed: 0
   };
+  state.comets = createWaveComets(state, 1);
+  return state;
 }
 
 export function createComet(id: number, tier: CometTier, position: Vector, velocity: Vector): Comet {
@@ -58,9 +72,24 @@ export function createComet(id: number, tier: CometTier, position: Vector, veloc
 
 export function stepGame(state: GameState, input: InputState, dt: number): GameState {
   const next = cloneState(state);
+  if (next.status === "game-over") {
+    return next;
+  }
+
   next.status = next.status === "ready" ? "playing" : next.status;
   next.elapsed += dt;
   next.fireCooldown = Math.max(0, next.fireCooldown - dt);
+  next.recoveryTimer = Math.max(0, next.recoveryTimer - dt);
+  if (next.status === "recovering" && next.recoveryTimer <= 0) {
+    next.status = "playing";
+  }
+  if (next.status === "wave-cleared") {
+    next.waveClearTimer = Math.max(0, next.waveClearTimer - dt);
+    if (next.waveClearTimer <= 0) {
+      beginNextWave(next);
+    }
+    return next;
+  }
 
   if (input.turnLeft) {
     next.skimmer.angle -= TURN_SPEED * dt;
@@ -115,8 +144,10 @@ export function stepGame(state: GameState, input: InputState, dt: number): GameS
   }));
 
   resolveShotHits(next);
-  if (next.comets.length === 0) {
+  resolveSkimmerCollision(next);
+  if (next.comets.length === 0 && next.status === "playing") {
     next.status = "wave-cleared";
+    next.waveClearTimer = WAVE_CLEAR_SECONDS;
   }
 
   return next;
@@ -125,6 +156,10 @@ export function stepGame(state: GameState, input: InputState, dt: number): GameS
 export function snapshot(state: GameState): GameSnapshot {
   return {
     status: state.status,
+    wave: state.wave,
+    lives: state.lives,
+    score: state.score,
+    riskChain: { ...state.riskChain },
     skimmer: { ...state.skimmer, position: { ...state.skimmer.position }, velocity: { ...state.skimmer.velocity } },
     shots: state.shots.map((shot) => ({ ...shot, position: { ...shot.position }, velocity: { ...shot.velocity } })),
     comets: state.comets.map((comet) => ({
@@ -133,6 +168,21 @@ export function snapshot(state: GameState): GameSnapshot {
       velocity: { ...comet.velocity }
     }))
   };
+}
+
+export function createWaveComets(state: GameState, wave: number): Comet[] {
+  const count = Math.min(2 + Math.floor((wave - 1) / 2), 5);
+  const speed = 58 + wave * 8;
+  const comets: Comet[] = [];
+  for (let i = 0; i < count; i += 1) {
+    const angle = ((wave * 71 + i * 137) % 360) * (Math.PI / 180);
+    const position = {
+      x: ((state.bounds.x * (0.18 + i * 0.31) + wave * 43) % (state.bounds.x - 120)) + 60,
+      y: ((state.bounds.y * (0.22 + i * 0.27) + wave * 29) % (state.bounds.y - 120)) + 60
+    };
+    comets.push(createComet(state.nextId++, "large", position, { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed }));
+  }
+  return comets;
 }
 
 export function wrapPosition(position: Vector, bounds: Vector): Vector {
@@ -172,11 +222,46 @@ function resolveShotHits(state: GameState): void {
     }
 
     const [hit] = remainingComets.splice(hitIndex, 1);
+    awardHitScore(state, hit.tier);
     spawnedComets.push(...splitComet(state, hit, shot));
   }
 
   state.shots = remainingShots;
   state.comets = [...remainingComets, ...spawnedComets];
+}
+
+function awardHitScore(state: GameState, tier: CometTier): void {
+  state.score += Math.round(TIER_SCORE[tier] * state.riskChain.multiplier);
+  state.riskChain.hits += 1;
+  state.riskChain.multiplier = Math.min(4, 1 + state.riskChain.hits * 0.25);
+}
+
+function resolveSkimmerCollision(state: GameState): void {
+  if (state.recoveryTimer > 0 || state.status !== "playing") {
+    return;
+  }
+
+  const collision = state.comets.find((comet) => distance(state.skimmer.position, comet.position) <= state.skimmer.radius + comet.radius);
+  if (!collision) {
+    return;
+  }
+
+  state.lives -= 1;
+  state.riskChain = { multiplier: 1, hits: 0 };
+  state.shots = [];
+  state.skimmer.position = { x: state.bounds.x / 2, y: state.bounds.y / 2 };
+  state.skimmer.velocity = { x: 0, y: 0 };
+  state.recoveryTimer = RECOVERY_SECONDS;
+  state.comets = state.comets.filter((comet) => distance(state.skimmer.position, comet.position) > state.skimmer.radius + comet.radius + 24);
+  state.status = state.lives <= 0 ? "game-over" : "recovering";
+}
+
+function beginNextWave(state: GameState): void {
+  state.wave += 1;
+  state.status = "playing";
+  state.waveClearTimer = 0;
+  state.shots = [];
+  state.comets = createWaveComets(state, state.wave);
 }
 
 function splitComet(state: GameState, comet: Comet, shot: Shot): Comet[] {
@@ -216,8 +301,14 @@ function cloneState(state: GameState): GameState {
       velocity: { ...comet.velocity }
     })),
     status: state.status,
+    wave: state.wave,
+    lives: state.lives,
+    score: state.score,
+    riskChain: { ...state.riskChain },
     nextId: state.nextId,
     fireCooldown: state.fireCooldown,
+    recoveryTimer: state.recoveryTimer,
+    waveClearTimer: state.waveClearTimer,
     elapsed: state.elapsed
   };
 }

@@ -21,4 +21,5 @@ test("plays the Slice 1 flight and fragmentation loop in-browser", async ({ page
   const snapshot = await page.evaluate(() => window.__meteorBreakersTest?.getSnapshot());
   expect(snapshot?.shots.length).toBeGreaterThan(0);
   expect(snapshot?.comets.length).toBe(2);
+  await expect(page.locator("#score")).toContainText("0 pts");
 });

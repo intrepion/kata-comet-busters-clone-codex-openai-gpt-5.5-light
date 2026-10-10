@@ -35,5 +35,35 @@ describe("Meteor Breakers flight and fragmentation", () => {
 
     expect(hit.comets.map((comet) => comet.tier)).toEqual(["medium", "medium"]);
     expect(hit.shots).toHaveLength(0);
+    expect(hit.score).toBe(100);
+    expect(hit.riskChain.multiplier).toBe(1.25);
+  });
+
+  it("resets the Risk Chain and starts a Recovery Window after collision", () => {
+    const state = createInitialState({ x: 960, y: 640 });
+    state.score = 500;
+    state.riskChain = { multiplier: 2, hits: 4 };
+    state.comets = [createComet(20, "large", { x: 480, y: 320 }, { x: 0, y: 0 })];
+    state.skimmer.position = { x: 480, y: 320 };
+
+    const next = stepGame(state, defaultInput, 1 / 60);
+
+    expect(next.lives).toBe(2);
+    expect(next.status).toBe("recovering");
+    expect(next.riskChain).toEqual({ multiplier: 1, hits: 0 });
+    expect(next.recoveryTimer).toBeGreaterThan(1.9);
+  });
+
+  it("advances to the next deterministic Wave after clearing all hazards", () => {
+    const state = createInitialState({ x: 960, y: 640 });
+    state.comets = [];
+    state.status = "wave-cleared";
+    state.waveClearTimer = 0.1;
+    const next = stepGame(state, defaultInput, 0.2);
+
+    expect(next.wave).toBe(2);
+    expect(next.status).toBe("playing");
+    expect(next.comets.every((comet) => comet.tier === "large")).toBe(true);
+    expect(next.comets.length).toBeGreaterThan(0);
   });
 });

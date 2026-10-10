@@ -35,7 +35,12 @@ export type InputState = {
   fire: boolean;
 };
 
-export type GameStatus = "ready" | "playing" | "wave-cleared";
+export type GameStatus = "ready" | "playing" | "recovering" | "wave-cleared" | "game-over";
+
+export type RiskChain = {
+  multiplier: number;
+  hits: number;
+};
 
 export type GameState = {
   bounds: Vector;
@@ -43,13 +48,23 @@ export type GameState = {
   shots: Shot[];
   comets: Comet[];
   status: GameStatus;
+  wave: number;
+  lives: number;
+  score: number;
+  riskChain: RiskChain;
   nextId: number;
   fireCooldown: number;
+  recoveryTimer: number;
+  waveClearTimer: number;
   elapsed: number;
 };
 
 export type GameSnapshot = {
   status: GameStatus;
+  wave: number;
+  lives: number;
+  score: number;
+  riskChain: RiskChain;
   skimmer: Skimmer;
   shots: Shot[];
   comets: Comet[];

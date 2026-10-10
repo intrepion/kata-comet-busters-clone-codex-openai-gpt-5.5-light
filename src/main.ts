@@ -1,12 +1,13 @@
 import "./styles.css";
 import type { GameState, InputState } from "./domain";
-import { createInitialState, defaultInput, snapshot, stepGame } from "./game";
+import { createComet, createInitialState, defaultInput, snapshot, stepGame } from "./game";
 
 declare global {
   interface Window {
     __meteorBreakersTest?: {
       getSnapshot: () => ReturnType<typeof snapshot>;
       reset: () => void;
+      loadScenario: (name: "single-large-shot" | "collision" | "clear-wave") => void;
       step: (input: Partial<InputState>, dt?: number) => void;
     };
   }
@@ -26,6 +27,9 @@ app.innerHTML = `
       </div>
       <div class="hud__cluster">
         <span id="status">Ready</span>
+        <span id="score">0 pts</span>
+        <span id="lives">3 lives</span>
+        <span id="wave">Wave 1</span>
         <span id="comets">2 threats</span>
       </div>
     </section>
@@ -40,8 +44,11 @@ app.innerHTML = `
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game");
 const statusLabel = document.querySelector<HTMLSpanElement>("#status");
+const scoreLabel = document.querySelector<HTMLSpanElement>("#score");
+const livesLabel = document.querySelector<HTMLSpanElement>("#lives");
+const waveLabel = document.querySelector<HTMLSpanElement>("#wave");
 const cometsLabel = document.querySelector<HTMLSpanElement>("#comets");
-if (!canvas || !statusLabel || !cometsLabel) {
+if (!canvas || !statusLabel || !scoreLabel || !livesLabel || !waveLabel || !cometsLabel) {
   throw new Error("Missing game surface");
 }
 
@@ -52,6 +59,9 @@ if (!context) {
 const gameCanvas = canvas;
 const ctx = context;
 const statusElement = statusLabel;
+const scoreElement = scoreLabel;
+const livesElement = livesLabel;
+const waveElement = waveLabel;
 const cometsElement = cometsLabel;
 
 let state = createInitialState({ x: gameCanvas.width, y: gameCanvas.height });
@@ -89,6 +99,24 @@ window.__meteorBreakersTest = {
   reset: () => {
     state = createInitialState({ x: gameCanvas.width, y: gameCanvas.height });
   },
+  loadScenario: (name) => {
+    state = createInitialState({ x: gameCanvas.width, y: gameCanvas.height });
+    if (name === "single-large-shot") {
+      state.comets = [createComet(100, "large", { x: state.skimmer.position.x, y: state.skimmer.position.y - 70 }, { x: 0, y: 0 })];
+      state.nextId = 101;
+      state.skimmer.angle = -Math.PI / 2;
+    }
+    if (name === "collision") {
+      state.comets = [createComet(200, "large", { ...state.skimmer.position }, { x: 0, y: 0 })];
+      state.nextId = 201;
+    }
+    if (name === "clear-wave") {
+      state.comets = [];
+      state.status = "wave-cleared";
+      state.waveClearTimer = 0.1;
+    }
+    render();
+  },
   step: (partialInput, dt = 1 / 60) => {
     state = stepGame(state, { ...defaultInput, ...partialInput }, dt);
     render();
@@ -118,8 +146,24 @@ function render(): void {
   for (const comet of state.comets) {
     drawComet(comet.position.x, comet.position.y, comet.radius, comet.tier);
   }
-  statusElement.textContent = state.status === "wave-cleared" ? "Wave cleared" : state.status === "playing" ? "Playing" : "Ready";
+  statusElement.textContent = formatStatus(state.status);
+  scoreElement.textContent = `${state.score} pts`;
+  livesElement.textContent = `${state.lives} ${state.lives === 1 ? "life" : "lives"}`;
+  waveElement.textContent = `Wave ${state.wave}`;
   cometsElement.textContent = `${state.comets.length} threat${state.comets.length === 1 ? "" : "s"}`;
+}
+
+function formatStatus(status: GameState["status"]): string {
+  if (status === "wave-cleared") {
+    return "Wave cleared";
+  }
+  if (status === "recovering") {
+    return "Recovering";
+  }
+  if (status === "game-over") {
+    return "Game over";
+  }
+  return status === "playing" ? "Playing" : "Ready";
 }
 
 function drawStarfield(): void {
