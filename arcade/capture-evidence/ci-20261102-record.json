@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "workflowCommit": "37c3764c541f1fc79209b1246f2d361b4390340a",
+  "sourceCommit": "bef0ea9220e926faf9de25bcb8d0d1551e72aee3",
+  "runId": "41419732762",
+  "url": "http://127.0.0.1:4249/",
+  "inputs": {
+    "index.html": "80e7c710907f0cadd9dd9706d111b92a0a79dd8854c1931fc71cd6a619cb50a2",
+    "file-dist/game.css": "44e91d87123f755b7da395e36b77b7c91a57ce5566a86347a4ad658d3cc3fc25",
+    "file-dist/game.js": "26c890f09ba1a4189776f63dc6f48074762d244925ac1d1fcb33ddfbd7b910ce"
+  },
+  "browser": "153.0.8010.12",
+  "viewport": {
+    "width": 1280,
+    "height": 1000
+  },
+  "screenshots": [
+    "meteor-breakers-01.png",
+    "meteor-breakers-02.png"
+  ]
+}

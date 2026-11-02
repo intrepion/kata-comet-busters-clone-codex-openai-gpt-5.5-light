@@ -1,6 +1,47 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "gameId": "kata-comet-busters-clone-codex-openai-gpt-5.5-light",
   "playUrl": "https://intrepion.github.io/kata-comet-busters-clone-codex-openai-gpt-5.5-light/",
-  "screenshots": []
+  "screenshots": [
+    {
+      "path": "arcade/screenshots/ci-20261102-01.jpg",
+      "sha256": "de2c0cb37a60d8035d19bb0f1a8ca929397c8a4f907b0c9ff1c70cab22fa72e1",
+      "alt": "Meteor Breakers gameplay, view 1",
+      "provenance": {
+        "kind": "ci_gameplay_capture",
+        "sourcePath": "arcade/capture-evidence/ci-20261102-01.png",
+        "sourceSha256": "4cd577ea0c69d90ff8905fb75713a055c982b6f22c659b686b7e5133239a688b",
+        "captureCommit": "bef0ea9220e926faf9de25bcb8d0d1551e72aee3",
+        "workflowRunId": "41419732762",
+        "inputHashes": {
+          "index.html": "80e7c710907f0cadd9dd9706d111b92a0a79dd8854c1931fc71cd6a619cb50a2",
+          "file-dist/game.css": "44e91d87123f755b7da395e36b77b7c91a57ce5566a86347a4ad658d3cc3fc25",
+          "file-dist/game.js": "26c890f09ba1a4189776f63dc6f48074762d244925ac1d1fcb33ddfbd7b910ce"
+        },
+        "publishedFilesVerifiedAt": "2026-11-02T19:01:20Z",
+        "captureRecordPath": "arcade/capture-evidence/ci-20261102-record.json",
+        "captureRecordSha256": "91cbd2ff6e14e6dea3bb149cdc239fde7967bea085f6d733b9c7fde5ce26e6b7"
+      }
+    },
+    {
+      "path": "arcade/screenshots/ci-20261102-02.jpg",
+      "sha256": "61f1217d31b930c4f2dec50672ecb72ad80f0218da8222f9f218ddf490a5936a",
+      "alt": "Meteor Breakers gameplay, view 2",
+      "provenance": {
+        "kind": "ci_gameplay_capture",
+        "sourcePath": "arcade/capture-evidence/ci-20261102-02.png",
+        "sourceSha256": "5c3c1a272d1cd6b1f31f4ee6fff638638b9d5dd0ff29524bf82260d11232f7a9",
+        "captureCommit": "bef0ea9220e926faf9de25bcb8d0d1551e72aee3",
+        "workflowRunId": "41419732762",
+        "inputHashes": {
+          "index.html": "80e7c710907f0cadd9dd9706d111b92a0a79dd8854c1931fc71cd6a619cb50a2",
+          "file-dist/game.css": "44e91d87123f755b7da395e36b77b7c91a57ce5566a86347a4ad658d3cc3fc25",
+          "file-dist/game.js": "26c890f09ba1a4189776f63dc6f48074762d244925ac1d1fcb33ddfbd7b910ce"
+        },
+        "publishedFilesVerifiedAt": "2026-11-02T19:01:20Z",
+        "captureRecordPath": "arcade/capture-evidence/ci-20261102-record.json",
+        "captureRecordSha256": "91cbd2ff6e14e6dea3bb149cdc239fde7967bea085f6d733b9c7fde5ce26e6b7"
+      }
+    }
+  ]
 }
